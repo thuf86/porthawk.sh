@@ -4,37 +4,57 @@
   <img src="https://img.shields.io/badge/Version-2.1-green?style=for-the-badge&logo=github">
   <img src="https://img.shields.io/badge/Python-3.7+-blue?style=for-the-badge&logo=python">
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge">
-  <img src="https://img.shields.io/badge/Authorized-Pentest-red?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Use-Authorized%20Pentest-red?style=for-the-badge">
 </p>
 
-<img width="1676" height="580" alt="image" src="https://github.com/user-attachments/assets/98adc807-6aa8-4c3f-92ff-e4a9f3d6ff7a" />
+<img width="1671" height="562" alt="image" src="https://github.com/user-attachments/assets/d395c5ac-0ff9-4da2-a982-ca3b111cc322" />
 
 # 🛡️ PortHawk
 
-**PortHawk** é um scanner de portas TCP **profissional, moderno e de alto desempenho**, desenvolvido para profissionais de **cibersegurança**, **pentesters**, **analistas de redes** e **estudantes avançados**.  
-Ele combina uma **interface interativa elegante** com um **backend robusto e otimizado**, focado em performance, precisão e clareza dos resultados.
+**PortHawk** é um scanner de portas TCP **profissional, moderno e orientado a desempenho**, desenvolvido para **pentesters**, **analistas de segurança**, **red teamers** e **estudantes avançados**.
+
+Ele une uma **interface interativa elegante**, **modo CLI para automação**, **concorrência inteligente** e **relatórios estruturados**, entregando uma experiência comparável a ferramentas profissionais de mercado — com código limpo e extensível.
 
 **Autor:** Romildo (thuf)  
-🌐 **Website:** https://medium.com/@romildothuf
+🌐 **Website:** https://foryousec.com  
+📦 **Versão:** 2.1  
+
 
 ## 📌 Visão Geral
 
-O PortHawk não se limita a identificar portas abertas. Ele foi projetado para **análise técnica real**, utilizando concorrência inteligente e técnicas de **fingerprinting**, entregando contexto, velocidade e confiabilidade durante auditorias autorizadas.
+Diferente de scanners básicos, o PortHawk foi projetado para **uso real em auditorias autorizadas**, focando em:
 
-Principais objetivos:
-- Rapidez sem sacrificar precisão
-- Feedback visual claro e profissional
-- Facilidade de uso para iniciantes e poder para usuários avançados
+- Performance previsível
+- Estabilidade em grandes ranges
+- Feedback visual claro
+- Automação e relatórios
+- Experiência de uso profissional (UX de terminal)
 
 
-## ⚙️ Instalação e Requisitos
+## ✨ Principais Recursos
 
-### Requisitos do Sistema
-- Python **3.7 ou superior**
+- 🔍 Scan TCP multithreaded de alta performance
+- 🧠 Concorrência dinâmica (threads adaptativas)
+- 🧭 Resolução automática de hostname (DNS)
+- 🎛️ Interface **Interativa + CLI**
+- 📊 Barra de progresso em tempo real (tqdm)
+- 🎨 Logs coloridos (Colorama)
+- 🗂️ Relatórios em **TXT e JSON**
+- 🛑 Encerramento seguro (graceful shutdown – Ctrl+C)
+- 📈 Estatísticas finais (tempo, taxa, portas abertas)
+
+
+## ⚙️ Requisitos
+
+- **Python 3.7 ou superior**
 - Linux / WSL / macOS / Windows
+- Permissão para executar scripts Python
 
-### Dependências
-Instale todas as bibliotecas necessárias com:
+
+## 📦 Instalação
+
+### 1️⃣ Clonar o repositório
 
 ```bash
-pip install pyfiglet tqdm colorama
+git clone https://github.com/seuusuario/porthawk.git
+cd porthawk
