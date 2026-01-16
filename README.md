@@ -14,9 +14,7 @@
 Ele combina uma **interface interativa elegante** com um **backend robusto e otimizado**, focado em performance, precisão e clareza dos resultados.
 
 **Autor:** Romildo (thuf)  
-🌐 **Website:** https://foryousec.com  
-📦 **Versão:** 2.1  
-
+🌐 **Website:** [https://foryousec.com](https://medium.com/@romildothuf)  
 
 ## 📌 Visão Geral
 
