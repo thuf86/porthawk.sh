@@ -1,159 +1,201 @@
 #!/usr/bin/env python3
 """
+PortHawk - Professional Port Scanner
 Autor: Romildo (thuf) - foryousec.com
+
+Uso responsável: execute somente em ambientes autorizados.
 """
 
 import socket
-import pyfiglet
-import argparse
+import sys
 import time
 import json
-import signal
-import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+
 from tqdm import tqdm
 from colorama import Fore, Style, init
 
 init(autoreset=True)
 
+
 class ProfessionalPortScanner:
-    
+
     def __init__(self):
         self.script_info = "Romildo (thuf) - foryousec.com"
+
         self.services = {
-            20: "FTP", 21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP",
-            53: "DNS", 80: "HTTP", 110: "POP3", 143: "IMAP", 443: "HTTPS",
-            3306: "MySQL", 3389: "RDP", 5432: "PostgreSQL", 8080: "HTTP-Proxy"
+            20: "FTP-Data",
+            21: "FTP",
+            22: "SSH",
+            23: "Telnet",
+            25: "SMTP",
+            53: "DNS",
+            80: "HTTP",
+            110: "POP3",
+            143: "IMAP",
+            443: "HTTPS",
+            993: "IMAPS",
+            995: "POP3S",
+            3306: "MySQL",
+            3389: "RDP",
+            5432: "PostgreSQL",
+            8080: "HTTP-Proxy",
+            8443: "HTTPS-Alt",
         }
+
         self.open_ports = []
-        self.stop_scanning = False
+        self.banners = {}
         self.start_time = None
         self.target_ip = None
-        self.banners = {} # Armazena banners capturados
-        
-    def print_banner(self):
-        print(f"\n{Fore.GREEN}{'='*65}")
-        banner = pyfiglet.figlet_format("PORTHAWK", font="slant", width=100)
-        print(f"{Fore.GREEN}{banner.rstrip()}{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW} {self.script_info}{Style.RESET_ALL}")
-        print(f"{Fore.GREEN}{'='*65}{Style.RESET_ALL}\n")
+        self.stop_event = threading.Event()
 
-    def grab_banner(self, ip, port, timeout):
-        """Tenta capturar a versão do serviço (Fingerprinting)"""
+    # ===================== BANNER FIXO =====================
+    def print_banner(self):
+        print(Fore.GREEN + "=" * 65)
+        print(Fore.GREEN + r"""
+██████╗  ██████╗ ██████╗ ████████╗██╗  ██╗ █████╗ ██╗    ██╗██╗  ██╗
+██╔══██╗██╔═══██╗██╔══██╗╚══██╔══╝██║  ██║██╔══██╗██║    ██║██║ ██╔╝
+██████╔╝██║   ██║██████╔╝   ██║   ███████║███████║██║ █╗ ██║█████╔╝ 
+██╔═══╝ ██║   ██║██╔══██╗   ██║   ██╔══██║██╔══██║██║███╗██║██╔═██╗ 
+██║     ╚██████╔╝██║  ██║   ██║   ██║  ██║██║  ██║╚███╔███╔╝██║  ██╗
+╚═╝      ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝ ╚══╝╚══╝ ╚═╝  ╚═╝
+                                                                    
+""")
+        print(Fore.YELLOW + f"---- {self.script_info} ----")
+        print(Fore.GREEN + "=" * 65 + Style.RESET_ALL + "\n")
+
+    # ===================== INPUT =====================
+    def interactive_input(self, prompt, default=None, numeric=False):
+        default_txt = f" [{default}]" if default is not None else ""
+        color = Fore.CYAN if not numeric else Fore.YELLOW
+
+        while True:
+            value = input(f"{color}{prompt}{default_txt}: {Style.RESET_ALL}").strip()
+            if not value and default is not None:
+                return default
+            if numeric:
+                try:
+                    return int(value)
+                except ValueError:
+                    continue
+            return value
+
+    # ===================== CORE =====================
+    def resolve_target(self, target):
+        try:
+            ip = socket.gethostbyname(target)
+            print(f"{Fore.GREEN}✓ Alvo resolvido: {target} → {ip}{Style.RESET_ALL}")
+            return ip
+        except socket.gaierror:
+            print(f"{Fore.RED}❌ Erro ao resolver DNS{Style.RESET_ALL}")
+            sys.exit(1)
+
+    def scan_port(self, ip, port, timeout):
+        if self.stop_event.is_set():
+            return None
+
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.settimeout(timeout)
+                if s.connect_ex((ip, port)) == 0:
+                    banner = self.grab_banner(ip, port, timeout)
+                    return port, banner
+        except OSError:
+            pass
+        return None
+
+    def grab_banner(self, ip, port, timeout):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(min(timeout, 0.8))
                 s.connect((ip, port))
-                # Envia um byte de teste para forçar resposta de alguns serviços
-                s.send(b'Hello\r\n')
-                banner = s.recv(1024).decode(errors='ignore').strip()
-                if banner:
-                    return banner[:50] # Limita tamanho do banner
-        except:
-            pass
-        return None
-
-    def scan_single_port(self, target_ip, port, timeout):
-        """Backend robusto com verificação de erro do SO"""
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.settimeout(timeout)
-                result = sock.connect_ex((target_ip, port))
-                
-                if result == 0:
-                    # Se aberta, tenta capturar versão do serviço
-                    banner = self.grab_banner(target_ip, port, timeout=0.8)
-                    if banner: self.banners[port] = banner
-                    return port
-        except (socket.timeout, ConnectionRefusedError):
-            pass
-        except Exception:
-            pass # Ignora erros de sistema/rede saturada
-        return None
-
-    # Lógica de interação mantida conforme original...
-    def interactive_input(self, prompt, default=None, port=False, validate_func=None):
-        default_str = f" [{default}]" if default is not None else ""
-        color = Fore.CYAN if not port else Fore.YELLOW
-        while True:
-            value = input(f"{color}{prompt}{default_str}: {Style.RESET_ALL}").strip()
-            if not value and default is not None: return default
-            if port:
                 try:
-                    val = int(value)
-                    if validate_func and not validate_func(val): continue
-                    return val
-                except ValueError: continue
-            return value
+                    data = s.recv(1024)
+                    if data:
+                        return data.decode(errors="ignore").strip()[:80]
+                except socket.timeout:
+                    pass
 
-    def resolve_target(self, target):
-        try:
-            resolved = socket.gethostbyname(target)
-            print(f"{Fore.GREEN}✓ Alvo resolvido: {target} → {resolved}{Style.RESET_ALL}")
-            return resolved
-        except socket.gaierror:
-            print(f"{Fore.RED}❌ Erro de DNS. Verifique o endereço.{Style.RESET_ALL}")
-            sys.exit(1)
+                s.sendall(b"Hello\r\n")
+                data = s.recv(1024)
+                return data.decode(errors="ignore").strip()[:80]
+        except OSError:
+            if port in (443, 993, 995, 8443):
+                return "TLS provável (sem handshake)"
+        return None
 
-    def scan_target(self, target_ip, start_port, end_port, timeout):
+    def scan(self, ip, ports, timeout, threads):
         self.start_time = time.time()
-        port_range = end_port - start_port + 1
-        workers = min(500, max(50, port_range // 5)) # Threading balanceado
-        
-        print(f"{Fore.GREEN}🔍 Escaneando Alvo: {target_ip} ({start_port}-{end_port}){Style.RESET_ALL}")
-        
+        threads = max(20, min(threads, 200))
+
+        print(f"\n{Fore.GREEN}🔍 Escaneando: {ip}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}🧵 Threads: {threads} | ⏱ Timeout: {timeout}s | 🔢 Portas: {len(ports)}{Style.RESET_ALL}\n")
+
         try:
-            with ThreadPoolExecutor(max_workers=workers) as executor:
-                futures = {executor.submit(self.scan_single_port, target_ip, port, timeout): port 
-                           for port in range(start_port, end_port + 1)}
-                
-                with tqdm(total=len(futures), desc="🔎 Progresso", unit="port",
-                          bar_format="{l_bar}%s{bar}%s| {n_fmt}/{total_fmt}" % (Fore.GREEN, Fore.WHITE)) as pbar:
+            with ThreadPoolExecutor(max_workers=threads) as executor:
+                futures = [executor.submit(self.scan_port, ip, p, timeout) for p in ports]
+
+                with tqdm(total=len(futures), desc="🔎 Progresso", unit="port") as bar:
                     for future in as_completed(futures):
-                        if self.stop_scanning: break
-                        res = future.result()
-                        if res:
-                            self.open_ports.append(res)
-                            svc = self.services.get(res, "Desconhecido")
-                            info = f" | Banner: {self.banners[res]}" if res in self.banners else ""
-                            print(f"{Fore.GREEN}✅ {res:5d} | {svc:<12} | ABERTA{info}{Style.RESET_ALL}")
-                        pbar.update(1)
+                        result = future.result()
+                        if result:
+                            port, banner = result
+                            self.open_ports.append(port)
+                            if banner:
+                                self.banners[port] = banner
+
+                            svc = self.services.get(port, "Desconhecido")
+                            info = f" | {banner}" if banner else ""
+                            print(f"{Fore.GREEN}✅ {port:5d} | {svc:<12} | ABERTA{info}{Style.RESET_ALL}")
+
+                        bar.update(1)
         except KeyboardInterrupt:
-            self.stop_scanning = True
+            self.stop_event.set()
 
-    def print_summary(self):
+    def summary(self):
         duration = time.time() - self.start_time
-        print(f"\n{Fore.MAGENTA}{'='*65}")
-        print(f"📊 RELATÓRIO FINAL | Duração: {duration:.1f}s")
-        print(f"{Fore.MAGENTA}{'='*65}{Style.RESET_ALL}")
-        
-        if self.open_ports:
-            self.open_ports.sort()
-            for port in self.open_ports:
-                svc = self.services.get(port, "Desconhecido")
-                banner = self.banners.get(port, "Sem detalhes do serviço")
-                print(f" {Fore.GREEN}{port:5d}/TCP{Style.RESET_ALL} - {Fore.CYAN}{svc:<12}{Style.RESET_ALL} ({banner})")
-        else:
-            print(f"{Fore.RED}Nenhuma porta aberta encontrada.{Style.RESET_ALL}")
+        print(f"\n{Fore.MAGENTA}{'=' * 65}")
+        print(f"📊 RELATÓRIO FINAL | Duração: {duration:.2f}s")
+        print(f"{Fore.MAGENTA}{'=' * 65}{Style.RESET_ALL}")
 
+        if not self.open_ports:
+            print(f"{Fore.RED}Nenhuma porta aberta encontrada{Style.RESET_ALL}")
+            return
+
+        for p in sorted(self.open_ports):
+            svc = self.services.get(p, "Desconhecido")
+            banner = self.banners.get(p, "Sem banner")
+            print(f"{Fore.GREEN}{p}/TCP{Style.RESET_ALL} - {Fore.CYAN}{svc}{Style.RESET_ALL} ({banner})")
+
+    # ===================== RUN =====================
     def run(self):
         self.print_banner()
+
         target = self.interactive_input("🎯 Digite o IP ou DNS")
         self.target_ip = self.resolve_target(target)
-        
-        # Opções simplificadas para fluidez
-        print(f"\n{Fore.CYAN}Range de Portas: 1:Comuns (1-1024) | 2:Web | 3:Full (1-65535){Style.RESET_ALL}")
+
+        print(f"\n{Fore.CYAN}1: Comuns (1-1024) | 2: Web | 3: Full | 4: Custom{Style.RESET_ALL}")
         opt = self.interactive_input("🔢 Escolha", "1")
-        
-        start, end = 1, 1024
-        if opt == "2": start, end = 80, 443
-        elif opt == "3": start, end = 1, 65535
-        
-        timeout = float(self.interactive_input("⏱️ Timeout (s)", "0.5"))
-        
-        self.scan_target(self.target_ip, start, end, timeout)
-        self.print_summary()
+
+        if opt == "2":
+            ports = [80, 443, 8080, 8443, 3000, 5000]
+        elif opt == "3":
+            ports = list(range(1, 65536))
+        elif opt == "4":
+            start = self.interactive_input("Porta inicial", "1", True)
+            end = self.interactive_input("Porta final", "1024", True)
+            ports = list(range(min(start, end), max(start, end) + 1))
+        else:
+            ports = list(range(1, 1025))
+
+        timeout = float(self.interactive_input("⏱ Timeout (s)", "0.5"))
+        threads = int(self.interactive_input("🧵 Threads (20-200)", "120", True))
+
+        self.scan(self.target_ip, ports, timeout, threads)
+        self.summary()
+
 
 if __name__ == "__main__":
     ProfessionalPortScanner().run()
