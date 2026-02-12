@@ -64,10 +64,13 @@ source venv/bin/activate
 
 3️⃣ Atualizar o pip
 pip install --upgrade pip
+python3 -m pip install tqdm
+python3 -m pip install colorama
+
 
 5️⃣ Dar permissão de execução ao script
 chmod +x port_scanner.py
 
 6️⃣ Executar o PortHawk
-python3 port_scanner.py
+python3 porthawk.py
 
